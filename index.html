@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Scheduler Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Process Scheduler Simulator</h1>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Process Input</h2>
+            </div>
+            <div class="form-group">
+                <button id="addProcessBtn" class="btn btn-primary">Add Process</button>
+                <button id="generateRandomBtn" class="btn btn-success">Generate Random Processes</button>
+                <button id="clearProcessesBtn" class="btn btn-danger">Clear All</button>
+            </div>
+            <table class="process-table" id="processTable">
+                <thead>
+                    <tr>
+                        <th>Process ID</th>
+                        <th>Arrival Time</th>
+                        <th>Burst Time</th>
+                        <th>Priority</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="processTableBody">
+                    <tr id="process-row-1">
+                        <td>P1</td>
+                        <td><input type="number" class="arrival-time" min="0" value="0"></td>
+                        <td><input type="number" class="burst-time" min="1" value="5"></td>
+                        <td><input type="number" class="priority" min="1" value="1"></td>
+                        <td>
+                            <button class="btn btn-danger delete-process">Delete</button>
+                        </td>
+                    </tr>
+                    <tr id="process-row-2">
+                        <td>P2</td>
+                        <td><input type="number" class="arrival-time" min="0" value="1"></td>
+                        <td><input type="number" class="burst-time" min="1" value="3"></td>
+                        <td><input type="number" class="priority" min="1" value="3"></td>
+                        <td>
+                            <button class="btn btn-danger delete-process">Delete</button>
+                        </td>
+                    </tr>
+                    <tr id="process-row-3">
+                        <td>P3</td>
+                        <td><input type="number" class="arrival-time" min="0" value="2"></td>
+                        <td><input type="number" class="burst-time" min="1" value="8"></td>
+                        <td><input type="number" class="priority" min="1" value="2"></td>
+                        <td>
+                            <button class="btn btn-danger delete-process">Delete</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Algorithm Selection</h2>
+            </div>
+            <div class="algo-options" id="algoOptions">
+                <div class="algo-option" data-algo="fcfs">
+                    <h3>FCFS</h3>
+                    <p>First Come First Served</p>
+                </div>
+                <div class="algo-option" data-algo="sjf">
+                    <h3>SJF</h3>
+                    <p>Shortest Job First</p>
+                </div>
+                <div class="algo-option" data-algo="priority">
+                    <h3>Priority</h3>
+                    <p>Priority Scheduling</p>
+                </div>
+                <div class="algo-option" data-algo="roundRobin">
+                    <h3>Round Robin</h3>
+                    <p>Time Quantum Based</p>
+                </div>
+                <div class="algo-option" data-algo="srtf">
+                    <h3>SRTF</h3>
+                    <p>Shortest Remaining Time First</p>
+                </div>
+            </div>
+            
+            <div id="timeQuantumContainer" class="form-group">
+                <label for="timeQuantum">Time Quantum</label>
+                <input type="number" id="timeQuantum" min="1" value="2">
+            </div>
+            
+            <div class="form-group">
+                <button id="simulateBtn" class="btn btn-primary">Simulate</button>
+                <button id="compareBtn" class="btn btn-success">Compare All Algorithms</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Gantt Chart</h2>
+            </div>
+            <div class="gantt-chart">
+                <div class="gantt-inner" id="ganttChart">
+                    <!-- Gantt chart bars will be added here -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Performance Metrics</h2>
+            </div>
+            <div class="metrics">
+                <div class="metric-box">
+                    <h3>Average Waiting Time</h3>
+                    <div class="metric-value" id="avgWaitingTime">0.00</div>
+                </div>
+                <div class="metric-box">
+                    <h3>Average Turnaround Time</h3>
+                    <div class="metric-value" id="avgTurnaroundTime">0.00</div>
+                </div>
+                <div class="metric-box">
+                    <h3>Average Response Time</h3>
+                    <div class="metric-value" id="avgResponseTime">0.00</div>
+                </div>
+                <div class="metric-box">
+                    <h3>CPU Utilization</h3>
+                    <div class="metric-value" id="cpuUtilization">0%</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card" id="comparisonCard" style="display: none;">
+            <div class="card-header">
+                <h2 class="card-title">Algorithm Comparison</h2>
+            </div>
+            <table class="process-table" id="comparisonTable">
+                <thead>
+                    <tr>
+                        <th>Algorithm</th>
+                        <th>Avg. Waiting Time</th>
+                        <th>Avg. Turnaround Time</th>
+                        <th>Avg. Response Time</th>
+                        <th>CPU Utilization</th>
+                    </tr>
+                </thead>
+                <tbody id="comparisonTableBody">
+                    <!-- Comparison data will be added here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Interactive Process Scheduler Simulator</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
