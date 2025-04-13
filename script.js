@@ -16,14 +16,47 @@ const cpuUtilization = document.getElementById('cpuUtilization');
 const comparisonCard = document.getElementById('comparisonCard');
 const comparisonTableBody = document.getElementById('comparisonTableBody');
 
-// API Configuration
-const API_BASE_URL = 'https://process-scheduler-backend.onrender.com/api';
-
 // State management
 let selectedAlgorithm = null;
 let processCounter = 4; // Start from P4 since we have 3 initial processes
 
+// Mock API functions (replace with actual API calls in production)
+const API = {
+    simulate: async (algorithm, processes, timeQuantum = 2) => {
+        // This is a mock implementation - replace with actual API call
+        console.log(`Simulating ${algorithm} with`, processes, `Time Quantum: ${timeQuantum}`);
+        
+        // Mock delay to simulate API call
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Generate mock results based on the algorithm
+        return generateMockResults(algorithm, processes, timeQuantum);
+    },
+    
+    generateRandomProcesses: async (count) => {
+        // Mock implementation - generates random processes
+        const processes = [];
+        for (let i = 0; i < count; i++) {
+            processes.push({
+                arrivalTime: Math.floor(Math.random() * 10),
+                burstTime: Math.floor(Math.random() * 10) + 1,
+                priority: Math.floor(Math.random() * 5) + 1
+            });
+        }
+        return { processes };
+    }
+};
+
 // Event Listeners
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize delete button event listeners for initial processes
+    document.querySelectorAll('.delete-process').forEach(btn => {
+        btn.addEventListener('click', function() {
+            this.closest('tr').remove();
+        });
+    });
+});
+
 addProcessBtn.addEventListener('click', addNewProcess);
 generateRandomBtn.addEventListener('click', generateRandomProcesses);
 clearProcessesBtn.addEventListener('click', clearAllProcesses);
@@ -36,11 +69,7 @@ algoOptions.forEach(option => {
         selectedAlgorithm = option.dataset.algo;
 
         // Show time quantum input only for Round Robin
-        if (selectedAlgorithm === 'roundRobin') {
-            timeQuantumContainer.style.display = 'block';
-        } else {
-            timeQuantumContainer.style.display = 'none';
-        }
+        timeQuantumContainer.style.display = selectedAlgorithm === 'roundRobin' ? 'block' : 'none';
     });
 });
 
@@ -57,41 +86,28 @@ simulateBtn.addEventListener('click', async () => {
         return;
     }
 
-    // Hide comparison card if showing
-    comparisonCard.style.display = 'none';
+    // Show loading state
+    simulateBtn.disabled = true;
+    simulateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Simulating...';
 
     try {
-        const response = await fetch(`${API_BASE_URL}/simulate/${selectedAlgorithm}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                processes: processes.map(p => ({
-                    arrivalTime: p.arrivalTime,
-                    burstTime: p.burstTime,
-                    priority: p.priority
-                })),
-                timeQuantum: parseInt(timeQuantumInput.value) || 2
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const results = await response.json();
+        const results = await API.simulate(
+            selectedAlgorithm, 
+            processes,
+            selectedAlgorithm === 'roundRobin' ? parseInt(timeQuantumInput.value) || 2 : undefined
+        );
         
         // Render results
         renderGanttChart(results.gantt);
         updateMetrics(results.metrics);
 
-        // Save processes to backend
-        await saveProcessesToBackend(processes);
-
     } catch (error) {
         console.error('Error during simulation:', error);
-        alert('Failed to run simulation. Check console for details.');
+        alert('Simulation failed. Check console for details.');
+    } finally {
+        // Reset button state
+        simulateBtn.disabled = false;
+        simulateBtn.innerHTML = '<i class="fas fa-play"></i> Simulate';
     }
 });
 
@@ -103,12 +119,12 @@ compareBtn.addEventListener('click', async () => {
         return;
     }
 
-    try {
-        // Save processes first
-        await saveProcessesToBackend(processes);
+    // Show loading state
+    compareBtn.disabled = true;
+    compareBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Comparing...';
 
-        // Run all algorithms
-        const timeQuantum = parseInt(timeQuantumInput.value) || 2;
+    try {
+        comparisonTableBody.innerHTML = '';
         
         const algorithms = [
             { name: 'FCFS', endpoint: 'fcfs' },
@@ -118,40 +134,14 @@ compareBtn.addEventListener('click', async () => {
             { name: 'SRTF', endpoint: 'srtf' }
         ];
 
-        comparisonTableBody.innerHTML = '';
-
         for (const algo of algorithms) {
-            const body = {
-                processes: processes.map(p => ({
-                    arrivalTime: p.arrivalTime,
-                    burstTime: p.burstTime,
-                    priority: p.priority
-                }))
-            };
-
-            if (algo.timeQuantum) {
-                body.timeQuantum = timeQuantum;
-            }
-
-            const response = await fetch(`${API_BASE_URL}/simulate/${algo.endpoint}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                console.error(`Failed to get results for ${algo.name}`);
-                continue;
-            }
-
-            const results = await response.json();
-            const displayName = algo.timeQuantum 
-                ? `${algo.name} (TQ=${timeQuantum})` 
-                : algo.name;
+            const results = await API.simulate(
+                algo.endpoint,
+                processes,
+                algo.timeQuantum ? parseInt(timeQuantumInput.value) || 2 : undefined
+            );
             
-            addComparisonRow(displayName, results.metrics);
+            addComparisonRow(algo.name, results.metrics);
         }
 
         // Show comparison card
@@ -159,7 +149,11 @@ compareBtn.addEventListener('click', async () => {
 
     } catch (error) {
         console.error('Error during comparison:', error);
-        alert('Failed to compare algorithms. Check console for details.');
+        alert('Comparison failed. Check console for details.');
+    } finally {
+        // Reset button state
+        compareBtn.disabled = false;
+        compareBtn.innerHTML = '<i class="fas fa-chart-bar"></i> Compare All';
     }
 });
 
@@ -173,13 +167,15 @@ function addNewProcess() {
         <td><input type="number" class="burst-time" min="1" value="5"></td>
         <td><input type="number" class="priority" min="1" value="1"></td>
         <td>
-            <button class="btn btn-danger delete-process">Delete</button>
+            <button class="btn btn-danger btn-sm delete-process">
+                <i class="fas fa-times"></i>
+            </button>
         </td>
     `;
     processTableBody.appendChild(newRow);
     
     // Add event listener for delete button
-    newRow.querySelector('.delete-process').addEventListener('click', () => {
+    newRow.querySelector('.delete-process').addEventListener('click', function() {
         newRow.remove();
     });
     
@@ -188,27 +184,15 @@ function addNewProcess() {
 
 async function generateRandomProcesses() {
     try {
-        const count = Math.floor(Math.random() * 10) + 1;
-        const response = await fetch(`${API_BASE_URL}/processes/random`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ count })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const count = Math.floor(Math.random() * 5) + 3; // 3-7 random processes
+        const { processes } = await API.generateRandomProcesses(count);
         
         // Clear existing processes
         processTableBody.innerHTML = '';
         processCounter = 1;
         
         // Add new random processes
-        data.processes.forEach((process, index) => {
+        processes.forEach(process => {
             const newRow = document.createElement('tr');
             newRow.id = `process-row-${processCounter}`;
             newRow.innerHTML = `
@@ -217,13 +201,15 @@ async function generateRandomProcesses() {
                 <td><input type="number" class="burst-time" min="1" value="${process.burstTime}"></td>
                 <td><input type="number" class="priority" min="1" value="${process.priority}"></td>
                 <td>
-                    <button class="btn btn-danger delete-process">Delete</button>
+                    <button class="btn btn-danger btn-sm delete-process">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </td>
             `;
             processTableBody.appendChild(newRow);
             
             // Add event listener for delete button
-            newRow.querySelector('.delete-process').addEventListener('click', () => {
+            newRow.querySelector('.delete-process').addEventListener('click', function() {
                 newRow.remove();
             });
             
@@ -232,80 +218,72 @@ async function generateRandomProcesses() {
 
     } catch (error) {
         console.error('Error generating random processes:', error);
-        alert('Failed to generate random processes. Check console for details.');
+        alert('Failed to generate random processes.');
     }
 }
 
-async function clearAllProcesses() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/processes/clear`, {
-            method: 'POST'
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        processTableBody.innerHTML = '';
-        processCounter = 1;
-        
-    } catch (error) {
-        console.error('Error clearing processes:', error);
-        alert('Failed to clear processes. Check console for details.');
-    }
-}
-
-async function saveProcessesToBackend(processes) {
-    try {
-        const response = await fetch(`${API_BASE_URL}/processes`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ processes })
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-    } catch (error) {
-        console.error('Error saving processes:', error);
-    }
+function clearAllProcesses() {
+    processTableBody.innerHTML = '';
+    processCounter = 1;
+    
+    // Add back the default empty state or initial processes if needed
+    addNewProcess();
+    addNewProcess();
+    addNewProcess();
 }
 
 function getProcessesFromTable() {
     const processes = [];
-    const rows = processTableBody.children;
-    for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
+    const rows = processTableBody.querySelectorAll('tr');
+    
+    rows.forEach(row => {
         const arrivalTime = parseInt(row.querySelector('.arrival-time').value);
         const burstTime = parseInt(row.querySelector('.burst-time').value);
         const priority = parseInt(row.querySelector('.priority').value);
+        
         processes.push({ 
             id: row.id.replace('process-row-', ''),
             arrivalTime, 
             burstTime, 
             priority 
         });
-    }
+    });
+    
     return processes;
 }
 
-function renderGanttChart(gantt) {
+function renderGanttChart(ganttData) {
     ganttChart.innerHTML = '';
-    for (let i = 0; i < gantt.length; i++) {
-        const process = gantt[i];
-        const bar = document.createElement('div');
-        bar.classList.add('gantt-bar');
-        bar.style.width = `${process.duration}px`;
-        bar.style.background = `var(--${process.color})`;
-        bar.innerHTML = `
-            <span class="gantt-time">${process.startTime}</span>
-            <span class="gantt-process">${process.name}</span>
-        `;
-        ganttChart.appendChild(bar);
+    
+    if (!ganttData || ganttData.length === 0) {
+        ganttChart.innerHTML = '<div class="no-data">No Gantt chart data available</div>';
+        return;
     }
+    
+    // Calculate total duration for scaling
+    const totalDuration = ganttData[ganttData.length - 1].endTime;
+    const containerWidth = ganttChart.offsetWidth;
+    const scale = containerWidth / totalDuration;
+    
+    ganttData.forEach(item => {
+        const bar = document.createElement('div');
+        bar.className = 'gantt-bar';
+        
+        // Scale the width based on duration
+        const width = Math.max(60, item.duration * scale);
+        bar.style.width = `${width}px`;
+        
+        // Assign different colors for different processes
+        const hue = (parseInt(item.name.substring(1)) * 137.508) % 360; // Golden angle for colors
+        bar.style.background = `hsl(${hue}, 70%, 60%)`;
+        
+        bar.innerHTML = `
+            <span class="gantt-process">${item.name}</span>
+            <span class="gantt-time">${item.startTime}-${item.endTime}</span>
+        `;
+        
+        ganttChart.appendChild(bar);
+    });
 }
 
 function updateMetrics(metrics) {
@@ -327,12 +305,81 @@ function addComparisonRow(algorithm, metrics) {
     comparisonTableBody.appendChild(row);
 }
 
-// Initialize the table with delete button event listeners
-document.addEventListener('DOMContentLoaded', () => {
-    const deleteButtons = document.querySelectorAll('.delete-process');
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            this.closest('tr').remove();
-        });
-    });
-});
+// Mock result generator for demonstration
+function generateMockResults(algorithm, processes, timeQuantum = 2) {
+    // Sort processes based on algorithm
+    let sortedProcesses = [...processes];
+    
+    switch(algorithm) {
+        case 'fcfs':
+            sortedProcesses.sort((a, b) => a.arrivalTime - b.arrivalTime);
+            break;
+        case 'sjf':
+            sortedProcesses.sort((a, b) => a.burstTime - b.burstTime);
+            break;
+        case 'priority':
+            sortedProcesses.sort((a, b) => a.priority - b.priority);
+            break;
+        case 'roundRobin':
+            // For RR, we'll simulate time slices
+            break;
+        case 'srtf':
+            sortedProcesses.sort((a, b) => (a.burstTime - a.executed) - (b.burstTime - b.executed));
+            break;
+    }
+    
+    // Generate mock Gantt chart
+    const gantt = [];
+    let currentTime = 0;
+    
+    if (algorithm === 'roundRobin') {
+        // Round Robin simulation
+        let remainingProcesses = processes.map(p => ({
+            ...p,
+            remainingTime: p.burstTime
+        }));
+        
+        while (remainingProcesses.some(p => p.remainingTime > 0)) {
+            for (const process of remainingProcesses) {
+                if (process.remainingTime > 0) {
+                    const executionTime = Math.min(timeQuantum, process.remainingTime);
+                    gantt.push({
+                        name: `P${process.id}`,
+                        startTime: currentTime,
+                        endTime: currentTime + executionTime,
+                        duration: executionTime
+                    });
+                    currentTime += executionTime;
+                    process.remainingTime -= executionTime;
+                }
+            }
+        }
+    } else {
+        // Other algorithms (simplified simulation)
+        for (const process of sortedProcesses) {
+            gantt.push({
+                name: `P${process.id}`,
+                startTime: currentTime,
+                endTime: currentTime + process.burstTime,
+                duration: process.burstTime
+            });
+            currentTime += process.burstTime;
+        }
+    }
+    
+    // Calculate mock metrics
+    const totalProcesses = processes.length;
+    const totalWaitingTime = processes.reduce((sum, p) => sum + Math.max(0, currentTime - p.arrivalTime - p.burstTime), 0);
+    const totalTurnaroundTime = processes.reduce((sum, p) => sum + (currentTime - p.arrivalTime), 0);
+    const totalResponseTime = processes.reduce((sum, p) => sum + (p.arrivalTime === 0 ? 0 : Math.random() * 5), 0);
+    
+    return {
+        gantt,
+        metrics: {
+            avgWaitingTime: totalWaitingTime / totalProcesses,
+            avgTurnaroundTime: totalTurnaroundTime / totalProcesses,
+            avgResponseTime: totalResponseTime / totalProcesses,
+            cpuUtilization: (currentTime / (currentTime + 5)) * 100 // Add some idle time
+        }
+    };
+}
