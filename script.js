@@ -17,7 +17,7 @@ const comparisonCard = document.getElementById('comparisonCard');
 const comparisonTableBody = document.getElementById('comparisonTableBody');
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://process-scheduler-backend.onrender.com/api';
 
 // State management
 let selectedAlgorithm = null;
